@@ -353,13 +353,22 @@
              (.resolve dest (str maven-dir "pom.xml"))
              last-mod))))
 
+(defn call-method
+  [^Class clazz method-name & args]
+  (let [^java.lang.reflect.Method m
+        (first (filter (fn [^java.lang.reflect.Method x]
+                         (.. x getName (equals method-name)))
+                       (.. clazz getDeclaredMethods)))]
+    (. m (setAccessible true))
+    (. m (invoke (into-array Object args)))))
+
 (defn run
   [{:keys [aot dest jar main-class no-pom ^File pom-file suppress verbose]
     :or {jar :uber}
     :as options
     cp-opt :classpath
     rm-opt :remove}]
-  (let [do-aot    (and aot main-class (not no-pom) (.exists pom-file))
+  (let [do-aot    (and aot main-class #_(not no-pom) #_(.exists pom-file))
         tmp-c-dir (when do-aot
                     (Files/createTempDirectory "depstarc" (make-array FileAttribute 0)))
         tmp-z-dir (Files/createTempDirectory "depstarz" (make-array FileAttribute 0))
@@ -375,11 +384,12 @@
                         (.put "create" "true")
                         (.put "encoding" "UTF-8"))]
 
-    #_(when do-aot
+    (when do-aot
       (try
         (println "Compiling" main-class "...")
         (binding [*compile-path* (str tmp-c-dir)]
-          (compile (symbol main-class)))
+          (call-method clojure.lang.RT "compile" (str main-class ".clj"))
+          #_(clojure.lang.RT/compile (str main-class ".clj")))
         (catch Throwable t
           (throw (ex-info (str "Compilation of " main-class " failed!")
                           (dissoc options :pom-file)
