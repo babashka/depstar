@@ -280,15 +280,10 @@
   [src dest options]
   (copy-source* src dest options))
 
-(defn current-classpath
-  []
-  (vec (.split ^String
-               (System/getProperty "java.class.path")
-               (System/getProperty "path.separator"))))
-
-(defn depstar-itself?
-  [p]
-  (re-find #"depstar" p))
+(defn the-classpath
+  [classpath]
+  (let [^String cp (or classpath (System/getProperty "java.class.path"))]
+    (vec (.split cp (System/getProperty "path.separator")))))
 
 (defn- first-by-tag
   [pom-text tag]
@@ -300,7 +295,9 @@
   "Using the pom.xml file in the current directory, build a manifest
   and pom.properties, and add both those and the pom.xml file to the JAR."
   [^Path dest {:keys [jar main-class pom-file]}]
-  (let [pom-text    (slurp pom-file)
+  (let [pom-text    (if (and pom-file (.exists (io/file pom-file)))
+                      (slurp pom-file)
+                      "")
         jdk         (str/replace (System/getProperty "java.version")
                                  #"_.*" "")
         group-id    (first-by-tag pom-text :groupId)
@@ -325,7 +322,7 @@
                          "groupId: " group-id "\n"
                          "artifactId: " artifact-id "\n")
         maven-dir   (str "META-INF/maven/" group-id "/" artifact-id "/")]
-    (when-not (and group-id artifact-id version)
+    #_(when-not (and group-id artifact-id version)
       (throw (ex-info "Unable to read pom.xml file!"
                       {:group-id group-id
                        :artifact-id artifact-id
@@ -348,7 +345,7 @@
       (let [target (.resolve dest (str maven-dir "pom.properties"))]
         (Files/createDirectories (.getParent target) (make-array FileAttribute 0))
         (copy! "pom.properties" is target last-mod)))
-    (with-open [is (io/input-stream pom-file)]
+    #_(with-open [is (io/input-stream pom-file)]
       (when *verbose*
         (println (str "\nCopying pom.xml to " maven-dir "pom.xml")))
       ;; we don't need the createDirectories call here
@@ -359,14 +356,18 @@
 (defn run
   [{:keys [aot dest jar main-class no-pom ^File pom-file suppress verbose]
     :or {jar :uber}
-    :as options}]
+    :as options
+    cp-opt :classpath
+    rm-opt :remove}]
   (let [do-aot    (and aot main-class (not no-pom) (.exists pom-file))
         tmp-c-dir (when do-aot
                     (Files/createTempDirectory "depstarc" (make-array FileAttribute 0)))
         tmp-z-dir (Files/createTempDirectory "depstarz" (make-array FileAttribute 0))
         cp        (into (cond-> [] do-aot (conj (str tmp-c-dir)))
-                        (remove depstar-itself?)
-                        (current-classpath))
+                        #_(if rm-opt
+                          (remove rm-opt)
+                          (map identity))
+                        (the-classpath cp-opt))
         dest-name (str/replace dest #"^.*[/\\]" "")
         jar-path  (.resolve tmp-z-dir ^String dest-name)
         jar-file  (java.net.URI. (str "jar:" (.toUri jar-path)))
@@ -374,7 +375,7 @@
                         (.put "create" "true")
                         (.put "encoding" "UTF-8"))]
 
-    (when do-aot
+    #_(when do-aot
       (try
         (println "Compiling" main-class "...")
         (binding [*compile-path* (str tmp-c-dir)]
@@ -393,7 +394,7 @@
                   *suppress-clash* suppress
                   *verbose* verbose]
           (run! #(copy-source % tmp options) cp)
-          (when (and (not no-pom) (.exists pom-file))
+          (when (and (not no-pom))
             (copy-pom tmp options)))))
 
     (let [dest-path (path dest)
