@@ -328,7 +328,7 @@
                        :artifact-id artifact-id
                        :version version})))
     (when *verbose* (println ""))
-    (println "Processing pom.xml for"
+    #_(println "Processing pom.xml for"
              (str "{" group-id "/" artifact-id
                   " {:mvn/version \"" version "\"}}"))
     (with-open [is (io/input-stream (.getBytes manifest))]
