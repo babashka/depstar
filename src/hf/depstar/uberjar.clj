@@ -287,7 +287,7 @@
 
 (defn- manifest
   "Inserts manifest into uberjar"
-  [^Path dest {:keys [jar main-class #_pom-file]}]
+  [^Path dest {:keys [#_jar main-class #_pom-file]}]
   (let [jdk         (str/replace (System/getProperty "java.version")
                                  #"_.*" "")
         build-now   (java.util.Date.)
@@ -297,11 +297,9 @@
                          "Build-Jdk: " jdk "\n"
                          (when @multi-release?
                            "Multi-Release: true\n")
-                         (when-not (= :thin jar)
+                         (when main-class
                            (str "Main-Class: "
-                                (if main-class
-                                  (str/replace main-class "-" "_")
-                                  "clojure.main")
+                                (str/replace main-class "-" "_")
                                 "\n")))]
     (with-open [is (io/input-stream (.getBytes manifest))]
       (when *verbose*
@@ -333,15 +331,13 @@
         (binding [*debug* (env-prop "debug")
                   *suppress-clash* suppress
                   *verbose* verbose]
-          (println "Building" (str (name jar) "jar:") dest)
+          (when *verbose* (println "Building" (str (name jar) "jar:") dest))
           (run! #(copy-source % tmp options) cp)
           (manifest tmp options))))
-
     (let [dest-path (path dest)
           parent (.getParent dest-path)]
       (when parent (.. parent toFile mkdirs))
       (Files/move jar-path dest-path copy-opts))
-
     (when (pos? @errors)
       (println "\nCompleted with errors!")
       (System/exit 1))))
