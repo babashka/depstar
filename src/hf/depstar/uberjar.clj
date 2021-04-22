@@ -281,9 +281,8 @@
   (copy-source* src dest options))
 
 (defn the-classpath
-  [classpath]
-  (let [^String cp (or classpath (System/getProperty "java.class.path"))]
-    (vec (.split cp (System/getProperty "path.separator")))))
+  [^String classpath]
+  (vec (.split classpath (System/getProperty "path.separator"))))
 
 (defn- manifest
   "Inserts manifest into uberjar"
