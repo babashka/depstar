@@ -1,7 +1,8 @@
 (ns hf.depstar.uberjar
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [edamame.core :as e])
   (:import (java.io InputStream PushbackReader)
            (java.nio.file CopyOption LinkOption OpenOption
                           StandardCopyOption StandardOpenOption
@@ -103,10 +104,10 @@
   :merge-edn
   [_ in target]
   (let [;; read but do not close input stream
-        f1 (edn/read (PushbackReader. (io/reader in)))
+        f1 (e/parse-next (PushbackReader. (io/reader in)) {:read-cond :allow :features #{:clj}})
         ;; read and then close target since we will rewrite it
         f2 (with-open [r (PushbackReader. (Files/newBufferedReader target))]
-             (edn/read r))]
+             (e/parse-next r {:read-cond :allow :features #{:clj}}))]
     (with-open [w (Files/newBufferedWriter target open-opts)]
       (binding [*out* w]
         (prn (merge f1 f2))))))
